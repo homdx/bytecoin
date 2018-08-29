@@ -1,22 +1,17 @@
-# Use Fedora 28 docker image
+# Use Alpine 3.8 docker image
 # Multistage docker build, requires docker 17.05
-FROM fedora:28 as builder
+FROM alpine as builder
 
-# If you have an old version of the docker, then
-# correct the previous line, it should be the
-# FROM fedora
-
-RUN dnf -y update && dnf -y install make  gcc-c++ cmake git wget libzip bzip2 which openssl-devel
+RUN apk update && apk add boost-dev cmake make gcc musl-dev linux-headers openssl-dev git wget bzip2-dev build-base gcc curl
 
 WORKDIR /app
 
-## Boost
 ARG BOOST_VERSION=1_68_0
 ARG BOOST_VERSION_DOT=1.68.0
 ARG BOOST_HASH=7f6130bc3cf65f56a618888ce9d5ea704fa10b462be126ad053e80e553d6d8b7
 RUN set -ex \
-    && curl -s -L -o  boost_${BOOST_VERSION}.tar.bz2 https://dl.bintray.com/boostorg/release/${BOOST_VERSION_DOT}/source/boost_${BOOST_VERSION}.tar.bz2 \
-    && echo "${BOOST_HASH} boost_${BOOST_VERSION}.tar.bz2" | sha256sum -c \
+    &&  curl -s -L -o  boost_${BOOST_VERSION}.tar.bz2 https://dl.bintray.com/boostorg/release/${BOOST_VERSION_DOT}/source/boost_${BOOST_VERSION}.tar.bz2 \
+    && echo "${BOOST_HASH}  boost_${BOOST_VERSION}.tar.bz2" | sha256sum -c \
     && tar -xvf boost_${BOOST_VERSION}.tar.bz2 \
     && mv boost_${BOOST_VERSION} boost \
     && cd boost \
@@ -31,7 +26,9 @@ RUN set -ex \
     && cd lmdb \
     && test `git rev-parse HEAD` = ${LMDB_HASH} || exit 1
 
-COPY . /app/bytecoin
+ENV test=1
+#COPY . /app/bytecoin
+RUN cd /app && git clone https://github.com/bcndev/bytecoin.git
 
 RUN set -ex \
     && mkdir /app/bytecoin/build \
@@ -41,10 +38,6 @@ RUN set -ex \
     && cp -v ../bin/* /usr/local/bin \
     && mkdir /usr/local/bin/wallet_file \
     && cp -v ../tests/wallet_file/* /usr/local/bin/wallet_file \
-    && dnf remove -y make  gcc-c++ cmake git wget openssl-devel \
-    && dnf install libstdc++ -y \
-    && dnf clean all \
-    && rm -rf /app \
     && echo '[ SHOW VERSION ]' \
     && bytecoind -v
 
@@ -52,18 +45,17 @@ RUN set -ex \
 # (not supported Multistage docker build)
 # Please comment all the lines below this!
 
-FROM fedora:28
+FROM alpine
 
 RUN set -ex \
-    && dnf update -y \
-    && dnf install libstdc++ -y \
-    && dnf clean all
+    && apk update \
+    && apk add --no-cache libstdc++ openssl
 
 COPY --from=builder /usr/local/bin/* /usr/local/bin/
 
 RUN ls -la /usr/local/bin/ \
     && mkdir -p /tests/wallet_file \
     && cp /usr/local/bin/*.wallet /tests/wallet_file/ \
-    && cd /tests && tests || : \
+    && cd /tests && tests \
     && echo '[ SHOW VERSION ]' \
-    && bytecoind -v
+    && bytecoind -v && cd tests && tests
