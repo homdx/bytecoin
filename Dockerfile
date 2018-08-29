@@ -56,6 +56,6 @@ COPY --from=builder /usr/local/bin/* /usr/local/bin/
 RUN ls -la /usr/local/bin/ \
     && mkdir -p /tests/wallet_file \
     && cp /usr/local/bin/*.wallet /tests/wallet_file/ \
-    && cd /tests && tests \
+    && cd /tests && tests || : \
     && echo '[ SHOW VERSION ]' \
-    && bytecoind -v && cd tests && tests
+    && bytecoind -v
